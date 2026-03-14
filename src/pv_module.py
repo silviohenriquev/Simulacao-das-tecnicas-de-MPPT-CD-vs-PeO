@@ -1,4 +1,5 @@
 from pvlib import pvsystem
+import pvlib
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -6,12 +7,39 @@ import matplotlib.pyplot as plt
 
 class PVModule:
 
-    def __init__(self, parameters):
-        """
-        Inicializa o módulo fotovoltaico com os parâmetros do fabricante.
-        """
-        self.parameters = parameters
+    def __init__(self, module):
+        self.module = module
+        self.parameters = self._estimate_params()
+    
+    def _convert_temp_coef(self, coef_percent, ref_value):
+        return (coef_percent / 100) * ref_value
 
+    def _estimate_params(self):
+        alpha_sc = self._convert_temp_coef(self.module['T_coef_sc'], self.module['I_sc_ref'])
+
+        beta_voc = self._convert_temp_coef(self.module['T_coef_oc'],self.module['V_oc_ref'])
+
+        I_L_ref, I_o_ref, R_s, R_sh_ref, a_ref, T_coef_sc =  pvlib.ivtools.sdm.fit_cec_sam(
+            celltype = "monoSi",
+            v_mp = self.module['V_mp_ref'],
+            i_mp = self.module['I_mp_ref'],
+            v_oc = self.module['V_oc_ref'],
+            i_sc = self.module['I_sc_ref'],
+            alpha_sc = alpha_sc,
+            beta_voc = beta_voc,
+            gamma_pmp = self.module['T_coef_pmp'],
+            cells_in_series = self.module['N_s'],
+        )
+
+        return {
+            'I_L_ref': I_L_ref,
+            'I_o_ref': I_o_ref,
+            'R_s': R_s,
+            'R_sh_ref': R_sh_ref,
+            'a_ref': a_ref,
+            'alpha_sc': T_coef_sc
+        }
+    
     def calc_params(self, Geff, Tcell):
         """
         Calcula os parâmetros do modelo de diodo único
@@ -121,7 +149,7 @@ class PVModule:
 
         plt.xlabel("Voltage [V]")
         plt.ylabel("Current [A]")
-        plt.title(self.parameters['Name'])
+        plt.title(self.module['Name'])
         plt.legend()
         plt.grid(True)
         plt.show()
@@ -151,7 +179,7 @@ class PVModule:
 
         plt.xlabel("Voltage [V]")
         plt.ylabel("Power [W]")
-        plt.title(self.parameters['Name'])
+        plt.title(self.module['Name'])
         plt.legend()
         plt.grid(True)
         plt.show()
