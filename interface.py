@@ -5,7 +5,7 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from src.modules import modules
-from pv_module import PVModule
+from src.pv_module import PVModule
 
 
 class PVApp:
