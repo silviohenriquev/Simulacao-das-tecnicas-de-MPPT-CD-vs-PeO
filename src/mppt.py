@@ -69,6 +69,8 @@ class MPPT:
     def _peo_pid_step(self, v, i, **kwargs):
         p = v * i
         dV = v - self.prev_v
+        
+        # Evita divisão por zero
         if abs(dV) < 1e-4:
             dV = 1e-4 if dV >= 0 else -1e-4
 
@@ -76,24 +78,32 @@ class MPPT:
         
         # Lógica de Direção do P&O
         if dP > 0:
-            self.direction = 1 if dV > 0 else -1
+            current_direction = 1 if dV > 0 else -1
         else:
-            self.direction = -1 if dV > 0 else 1
+            current_direction = -1 if dV > 0 else 1
+
+        # --- CORREÇÃO DO INTEGRAL WINDUP ---
+        # Se a direção mudou, significa que cruzamos o Ponto de Máxima Potência.
+        # Precisamos zerar a integral para não acumular erro passado.
+        if current_direction != self.direction:
+            self.integral = 0
+            
+        self.direction = current_direction
 
         # Cálculo do Erro e PID
         error = abs(dP / dV)
-        self.integral = np.clip(self.integral + error, -1, 1)
+        # Aumentei um pouco o limite do clip do integrador para dar mais margem de atuação
+        self.integral = np.clip(self.integral + error, -5, 5) 
         derivative = error - self.prev_error
         
-        # Calcula o tamanho do passo e limita os valores
+        # Calcula o tamanho do passo
         step_raw = self.kp * error + self.ki * self.integral + self.kd * derivative
         step = np.clip(abs(step_raw), 0.005, 2.0)
         
-        # --- AS LINHAS CORRIGIDAS ---
-        # 1. Atualiza a "memória" do controlador
+        # Atualiza a "memória" do controlador
         self.prev_error = error
         self.prev_v = v
         self.prev_p = p
         
-        # 2. Retorna a NOVA TENSÃO (Tensão Atual + Direção * Passo)
+        # Retorna a NOVA TENSÃO
         return v + self.direction * step
