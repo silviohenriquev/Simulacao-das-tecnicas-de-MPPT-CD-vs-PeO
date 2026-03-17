@@ -41,12 +41,21 @@ class PVApp:
         self.run_modelling_update()
 
     # =========================================================================
-    # ---------------- ABA 1: MODELAGEM (SEU CÓDIGO ORIGINAL) -----------------
+    # ---------------- ABA 1: MODELAGEM (REORGANIZADA) -----------------
     # =========================================================================
     def setup_modelling_tab(self):
-        # Frame de Inputs
-        input_frame = ttk.LabelFrame(self.tab_modelling, text="Module Parameters")
-        input_frame.grid(row=0, column=0, padx=10, pady=10, sticky="n")
+        # Criamos dois frames principais para dividir a aba em duas colunas
+        left_column = ttk.Frame(self.tab_modelling)
+        left_column.grid(row=0, column=0, padx=10, pady=10, sticky="n")
+
+        right_column = ttk.Frame(self.tab_modelling)
+        right_column.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+
+        # --- COLUNA 1 (ESQUERDA): Parâmetros um abaixo do outro ---
+        
+        # Frame de Inputs (Module Parameters)
+        input_frame = ttk.LabelFrame(left_column, text="Module Parameters")
+        input_frame.pack(fill="x", pady=5)
 
         params_in = ["I_sc_ref", "V_oc_ref", "I_mp_ref", "V_mp_ref", "N_s", "T_coef_sc", "T_coef_oc", "T_coef_pmp"]
         for i, p in enumerate(params_in):
@@ -55,6 +64,7 @@ class PVApp:
             ttk.Entry(input_frame, textvariable=var, width=10).grid(row=i, column=1, padx=5, pady=2)
             self.entries[p] = var
 
+        # Campos de teste (G e T) dentro do mesmo frame ou logo abaixo
         ttk.Label(input_frame, text="Irradiance").grid(row=9, column=0, sticky="w", padx=5, pady=2)
         self.G_mod = tk.DoubleVar(value=1000)
         ttk.Entry(input_frame, textvariable=self.G_mod, width=10).grid(row=9, column=1, padx=5, pady=2)
@@ -63,29 +73,33 @@ class PVApp:
         self.T_mod = tk.DoubleVar(value=25)
         ttk.Entry(input_frame, textvariable=self.T_mod, width=10).grid(row=10, column=1, padx=5, pady=2)
 
-        ttk.Button(input_frame, text="Estimate Parameters", command=self.run_modelling_update).grid(row=8, column=0, columnspan=2, pady=10)
+        ttk.Button(input_frame, text="Estimate Parameters", command=self.run_modelling_update).grid(row=11, column=0, columnspan=2, pady=10)
 
-        # Frame de Parâmetros Estimados
-        param_frame = ttk.LabelFrame(self.tab_modelling, text="Estimated Parameters")
-        param_frame.grid(row=0, column=1, padx=10, pady=10, sticky="n")
+        # Frame de Parâmetros Estimados (Abaixo dos inputs)
+        param_frame = ttk.LabelFrame(left_column, text="Estimated Parameters")
+        param_frame.pack(fill="x", pady=10)
 
         params_out = ['I_L_ref', 'I_o_ref', 'R_s', 'R_sh_ref', 'a_ref', 'alpha_sc']
         for i, p in enumerate(params_out):
             ttk.Label(param_frame, text=p).grid(row=i, column=0, sticky="w", padx=5, pady=2)
             var = tk.StringVar()
-            ttk.Label(param_frame, textvariable=var, width=12).grid(row=i, column=1, padx=5, pady=2)
+            ttk.Label(param_frame, textvariable=var, width=15, foreground="blue").grid(row=i, column=1, padx=5, pady=2)
             self.param_vars[p] = var
 
-        # Frame de Gráficos (IV e PV)
-        plot_frame = ttk.Frame(self.tab_modelling)
-        plot_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=10)
-
-        self.mod_fig = Figure(figsize=(7, 5))
+        # --- COLUNA 2 (DIREITA): Gráficos um abaixo do outro ---
+        
+        self.mod_fig = Figure(figsize=(7, 7)) # Aumentei um pouco a altura para acomodar os dois
         self.ax_iv = self.mod_fig.add_subplot(211)
         self.ax_pv_mod = self.mod_fig.add_subplot(212)
 
-        self.mod_canvas = FigureCanvasTkAgg(self.mod_fig, master=plot_frame)
-        self.mod_canvas.get_tk_widget().pack()
+        self.mod_canvas = FigureCanvasTkAgg(self.mod_fig, master=right_column)
+        self.mod_canvas.get_tk_widget().pack(side="top", fill="both", expand=True)
+
+        # HABILITAR A LUPA (Navigation Toolbar)
+        # Ela aparece logo abaixo do gráfico
+        self.toolbar_mod = NavigationToolbar2Tk(self.mod_canvas, right_column)
+        self.toolbar_mod.update()
+        self.toolbar_mod.pack(side="top", fill="x")
 
     def run_modelling_update(self):
         try:
