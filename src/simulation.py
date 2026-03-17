@@ -163,22 +163,50 @@ class Simulation:
             'p_max': np.zeros_like(self.t)
         }
 
+        # ==========================================
+        # VARIÁVEIS DO SISTEMA DE CACHE
+        # ==========================================
+        last_G = -1
+        last_T = -1
+        cached_p_mp = 0
+        cached_voc = 0
+
         for k in range(len(self.t)):
-            i_current = self.module.current_at_voltage(v_current, self.G[k], self.T[k])
+            current_G = self.G[k]
+            current_T = self.T[k]
+
+            # --- 1. SISTEMA DE CACHE ---
+            # Só recalcula a curva completa da pvlib se a irradiância ou temperatura mudarem!
+            # Isso acelera a simulação em até 90% para degraus longos.
+            if current_G != last_G or current_T != last_T:
+                _, _, curve = self.module.pv_curve(current_G, current_T)
+                cached_p_mp = curve['p_mp']
+                cached_voc = curve['v_oc']
+                
+                # Atualiza a memória do cache
+                last_G = current_G
+                last_T = current_T
+
+            # --- 2. TRAVA DE TENSÃO DE SEGURANÇA ---
+            # Impede que o MPPT peça uma tensão maior que o Voc atual.
+            # É isso que evita que o solver brentq/lambertw exploda a potência.
+            v_current = np.clip(v_current, 0, cached_voc * 0.99)
+
+            # Medição no painel com a tensão já validada
+            i_current = self.module.current_at_voltage(v_current, current_G, current_T)
+            i_current = max(0, i_current) # Trava física: corrente gerada não pode ser negativa
+            
             p_current = v_current * i_current
             
+            # Salva no vetor de resultados
             res['v'][k] = v_current
             res['i'][k] = i_current
             res['p'][k] = p_current
-            
-            _, _, curve = self.module.pv_curve(self.G[k], self.T[k])
-            res['p_max'][k] = curve['p_mp']
+            res['p_max'][k] = cached_p_mp
 
-            # Pega o Voc corrigido termicamente!
-            voc_atualizado = curve['v_oc']
-
+            # Pega o Voc corrigido termicamente do cache
             if k < len(self.t) - 1:
-                v_current = self.mppt.update(v_current, i_current, voc=voc_atualizado)
+                v_current = self.mppt.update(v_current, i_current, voc=cached_voc)
                 
         # Salva a rodada no dicionário principal
         self.all_results[run_name] = res
