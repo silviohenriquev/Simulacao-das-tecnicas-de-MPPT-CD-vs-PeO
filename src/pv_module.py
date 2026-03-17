@@ -77,7 +77,8 @@ class PVModule:
 
         I = pvsystem.i_from_v(
             voltage=V,
-            method='lambertw',
+            # method='lambertw',
+            method='brentq',
             **params
         )
 
@@ -106,7 +107,8 @@ class PVModule:
 
         i = pvsystem.i_from_v(
             voltage=v,
-            method='lambertw',
+            # method='lambertw',
+            method='brentq',
             **params
         )
 

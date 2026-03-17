@@ -12,3 +12,6 @@ modules = {
         'T_coef_pmp': -0.29, # Coeficiente de temperatura da tensão de circuito aberto (%/°C)
     }
 }
+
+
+
