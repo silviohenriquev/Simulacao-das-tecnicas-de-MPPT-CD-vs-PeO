@@ -271,3 +271,45 @@ class Simulation:
         eficiencia = (np.sum(p_extraida) / np.sum(p_maxima)) * 100
 
         return eficiencia
+    
+    def plot_tracking_with_conditions(self, run_name):
+        """
+        Retorna uma Figura do Matplotlib mostrando a curva PV
+        e a trajetória de rastreamento do MPPT sobre ela.
+        """
+        if run_name not in self.all_results:
+            print(f"Erro: O resultado '{run_name}' não existe.")
+            return None
+
+        # Encontra os índices onde a Irradiância ou Temperatura mudaram (os degraus)
+        changes = np.where(
+            (np.diff(self.G) != 0) | (np.diff(self.T) != 0)
+        )[0] + 1
+        indices = np.concatenate(([0], changes))
+
+        fig = plt.figure(figsize=(8, 6))
+
+        # Plota as curvas P-V estáticas para cada condição climática
+        for idx in indices:
+            Geff = self.G[idx]
+            Tcell = self.T[idx]
+
+            v, p, curve = self.module.pv_curve(Geff, Tcell)
+            label = f"Curve: G={Geff} W/m², T={Tcell}°C"
+            
+            plt.plot(v, p, label=label, alpha=0.5, linestyle="--")
+            
+            # Marca o Ponto de Máxima Potência (MPP) teórico
+            plt.plot(curve["v_mp"], curve["p_mp"], "ko")
+
+        # Plota a trajetória dinâmica do MPPT
+        res = self.all_results[run_name]
+        plt.plot(res['v'], res['p'], "r-", label=f"Trajectory: {run_name}", linewidth=1.5, alpha=0.8)
+
+        plt.xlabel("Voltage (V)")
+        plt.ylabel("Power (W)")
+        plt.title(f"MPPT Tracking on P-V Curve - {run_name}")
+        plt.grid(True)
+        plt.legend()
+
+        return fig # Retorna a figura em vez de usar plt.show()

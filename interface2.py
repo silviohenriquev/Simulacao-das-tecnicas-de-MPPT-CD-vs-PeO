@@ -226,15 +226,33 @@ class PVApp:
         # Botão Rodar
         ttk.Button(ctrl_panel, text="RUN COMPARISON", command=self.run_mppt_comparison).pack(fill="x", pady=10)
 
-        # Resultados
+        # Resultados (Atualizado com os botões See Tracker)
         res_frame = ttk.LabelFrame(ctrl_panel, text="Tracking Efficiency (%)")
         res_frame.pack(fill="x", pady=5)
-        self.eff_cv_var = tk.StringVar(value="CV: ---")
-        self.eff_fixed_var = tk.StringVar(value="Fixed: ---")
-        self.eff_pid_var = tk.StringVar(value="PID: ---")
-        ttk.Label(res_frame, textvariable=self.eff_cv_var, foreground="blue").pack(anchor="w")
-        ttk.Label(res_frame, textvariable=self.eff_fixed_var, foreground="green").pack(anchor="w")
-        ttk.Label(res_frame, textvariable=self.eff_pid_var, foreground="red").pack(anchor="w")
+        
+        # Dicionários para guardar as variáveis e os botões
+        self.eff_vars = {
+            "CV Method": tk.StringVar(value="CV: ---"),
+            "P&O Fixed": tk.StringVar(value="Fixed: ---"),
+            "P&O PID": tk.StringVar(value="PID: ---")
+        }
+        self.tracker_buttons = {}
+        
+        # Configuração das cores para manter a legenda visual
+        colors = {"CV Method": "blue", "P&O Fixed": "green", "P&O PID": "red"}
+
+        for alg, color in colors.items():
+            row_frame = ttk.Frame(res_frame)
+            row_frame.pack(fill="x", pady=2, padx=5)
+            
+            # Label da Eficiência
+            ttk.Label(row_frame, textvariable=self.eff_vars[alg], foreground=color, width=15).pack(side="left")
+            
+            # Botão "See Tracker" (inicia desabilitado)
+            btn = ttk.Button(row_frame, text="See Tracker", state="disabled",
+                             command=lambda name=alg: self.show_tracker_popup(name))
+            btn.pack(side="right")
+            self.tracker_buttons[alg] = btn
 
         # --- COLUNA DA DIREITA: GRÁFICOS ---
         plot_frame = ttk.Frame(main_sim_frame)
@@ -252,6 +270,8 @@ class PVApp:
         
         self.toolbar = NavigationToolbar2Tk(self.sim_canvas, toolbar_frame)
         self.toolbar.update()
+
+
 
     def run_mppt_comparison(self):
         try:
@@ -290,10 +310,15 @@ class PVApp:
             mppt.peo_pid_method(kp=self.mppt_kp.get(), ki=self.mppt_ki.get())
             sim.run(run_name="P&O PID", v_start=v_start)
 
-            # 5. Atualizar Eficiências
-            self.eff_cv_var.set(f"CV Method: {sim.calculate_efficiency('CV Method'):.2f} %")
-            self.eff_fixed_var.set(f"P&O Fixed: {sim.calculate_efficiency('P&O Fixed'):.2f} %")
-            self.eff_pid_var.set(f"P&O PID: {sim.calculate_efficiency('P&O PID'):.2f} %")
+            self.current_sim = sim
+
+            # 5. Atualizar Eficiências e Habilitar Botões
+            for alg in ["CV Method", "P&O Fixed", "P&O PID"]:
+                eff = sim.calculate_efficiency(alg)
+                # Atualiza o texto curto (ex: CV: 99.50%)
+                self.eff_vars[alg].set(f"{alg.split()[0]}: {eff:.2f} %")
+                # Habilita o botão See Tracker
+                self.tracker_buttons[alg].config(state="normal")
 
             # 6. Renderizar Gráficos
             self.ax_p.clear()
@@ -322,6 +347,33 @@ class PVApp:
 
         except Exception as e:
             print(f"Erro na simulação comparativa: {e}")
+
+    def show_tracker_popup(self, run_name):
+        """
+        Abre uma nova janela pop-up exibindo o gráfico de rastreamento do MPPT
+        gerado pela classe Simulation.
+        """
+        # Verifica se uma simulação já foi rodada e está salva
+        if hasattr(self, 'current_sim') and self.current_sim:
+            # Cria a janela Pop-up flutuante
+            popup = tk.Toplevel(self.root)
+            popup.title(f"Tracker Viewer - {run_name}")
+            popup.geometry("750x600")
+            
+            # Chama o método da Simulation que devolve a Figura do Matplotlib
+            fig = self.current_sim.plot_tracking_with_conditions(run_name)
+            
+            if fig:
+                # Desenha o gráfico na nova janela
+                canvas = FigureCanvasTkAgg(fig, master=popup)
+                canvas.draw()
+                canvas.get_tk_widget().pack(side="top", fill="both", expand=True)
+                
+                # Adiciona a lupa (Toolbar) na parte de baixo do pop-up
+                toolbar_frame = ttk.Frame(popup)
+                toolbar_frame.pack(side="bottom", fill="x")
+                toolbar = NavigationToolbar2Tk(canvas, toolbar_frame)
+                toolbar.update()
 
 if __name__ == "__main__":
     root = tk.Tk()
