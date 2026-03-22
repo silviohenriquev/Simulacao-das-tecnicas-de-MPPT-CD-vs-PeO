@@ -349,31 +349,27 @@ class PVApp:
             print(f"Erro na simulação comparativa: {e}")
 
     def show_tracker_popup(self, run_name):
-        """
-        Abre uma nova janela pop-up exibindo o gráfico de rastreamento do MPPT
-        gerado pela classe Simulation.
-        """
-        # Verifica se uma simulação já foi rodada e está salva
         if hasattr(self, 'current_sim') and self.current_sim:
-            # Cria a janela Pop-up flutuante
             popup = tk.Toplevel(self.root)
             popup.title(f"Tracker Viewer - {run_name}")
-            popup.geometry("750x600")
+            popup.geometry("800x650")
             
-            # Chama o método da Simulation que devolve a Figura do Matplotlib
             fig = self.current_sim.plot_tracking_with_conditions(run_name)
             
             if fig:
-                # Desenha o gráfico na nova janela
+                # Container para o gráfico
                 canvas = FigureCanvasTkAgg(fig, master=popup)
-                canvas.draw()
-                canvas.get_tk_widget().pack(side="top", fill="both", expand=True)
+                canvas_widget = canvas.get_tk_widget()
+                canvas_widget.pack(side="top", fill="both", expand=True)
                 
-                # Adiciona a lupa (Toolbar) na parte de baixo do pop-up
-                toolbar_frame = ttk.Frame(popup)
-                toolbar_frame.pack(side="bottom", fill="x")
-                toolbar = NavigationToolbar2Tk(canvas, toolbar_frame)
+                # Toolbar (Lupa, Pan, Zoom)
+                # Importante: O master da Toolbar deve ser o frame/janela onde ela ficará
+                toolbar = NavigationToolbar2Tk(canvas, popup)
                 toolbar.update()
+                toolbar.pack(side="bottom", fill="x")
+                
+                # Força o desenho inicial
+                canvas.draw()
 
 if __name__ == "__main__":
     root = tk.Tk()
